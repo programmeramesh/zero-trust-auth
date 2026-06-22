@@ -14,6 +14,9 @@ class EmailService {
           pass: process.env.SMTP_PASS,
         },
       });
+      console.log('SMTP transporter configured for email delivery.');
+    } else {
+      console.warn('SMTP transporter is not configured. Email sending will be skipped.');
     }
   }
 
@@ -46,6 +49,26 @@ class EmailService {
 
     const result = await this.sendMail({ to: toEmail, subject, html });
     return result || link; // return link when sending not configured
+  }
+
+  async sendResetPasswordEmail(toEmail, token) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const link = `${frontendUrl.replace(/\/$/, '')}/reset-password/${token}`;
+
+    const subject = 'SecureVault password reset request';
+    const html = `
+      <p>We received a request to reset the password for your SecureVault account.</p>
+      <p>Click the secure link below to choose a new password. The link expires in 60 minutes.</p>
+      <p><a href="${link}">${link}</a></p>
+      <p>If you did not request this, no action is required and your current password will remain unchanged.</p>
+    `;
+
+    const info = await this.sendMail({ to: toEmail, subject, html });
+    return {
+      link,
+      success: Boolean(info),
+      info,
+    };
   }
 }
 

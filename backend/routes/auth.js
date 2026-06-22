@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const authMiddleware = require("../middleware/authMiddleware");
+const { authValidation } = require("../middleware/validationMiddleware");
 const User = require("../models/User");
 const router = require("express").Router();
 const crypto = require("crypto");
@@ -53,20 +54,37 @@ router.post("/verify-captcha", (req, res) => {
   }
 });
 
+const hashResetToken = (token) => {
+  return crypto.createHash('sha256').update(token).digest('hex');
+};
+
 // FORGOT PASSWORD
-router.post("/forgot-password", async (req, res) => {
+router.post("/forgot-password", authValidation.forgotPassword, async (req, res) => {
   const { email } = req.body;
+  console.log('FORGOT PASSWORD REQUEST:', { email, ip: req.ip });
+
   const user = await User.findOne({ email });
   if (!user) {
-    return res.json({ message: "If email exists, link sent" });
+    console.warn('Forgot password requested for unknown email:', email);
+    return res.json({ message: "If an account exists, a password reset link has been sent." });
   }
+
   const token = crypto.randomBytes(32).toString("hex");
-  user.resetToken = token;
+  user.resetTokenHash = hashResetToken(token);
   user.resetTokenExpiry = Date.now() + 3600000; // 1 hour
   await user.save();
-  console.log("RESET LINK:");
-  console.log(`http://localhost:3000/reset-password/${token}`);
-  res.json({ message: "Reset link generated" });
+
+  try {
+    const result = await emailService.sendResetPasswordEmail(user.email, token);
+    console.log('PASSWORD RESET LINK:', result.link);
+    if (!result.success) {
+      console.warn('Password reset email was not sent via SMTP; link is shown in console for development.');
+    }
+  } catch (err) {
+    console.error('Failed to send reset email:', err);
+  }
+
+  res.json({ message: "If an account exists, a password reset link has been sent." });
 });
 
 // SIGNUP
@@ -600,52 +618,49 @@ router.post("/update-password", authMiddleware, async (req, res) => {
 });
 
 // RESET PASSWORD
-router.post("/reset-password/:token", async (req, res) => {
+router.post("/reset-password/:token", authValidation.resetPassword, async (req, res) => {
   const { token } = req.params;
   const { password } = req.body;
-  
+
+  const tokenHash = hashResetToken(token);
   const user = await User.findOne({
-    resetToken: token,
+    resetTokenHash: tokenHash,
     resetTokenExpiry: { $gt: Date.now() }
   });
   if (!user) {
     return res.status(400).json({ message: "Invalid or expired token" });
   }
 
-  // Validate password against policy
   const passwordValidation = passwordPolicyService.validatePassword(password);
   if (!passwordValidation.isValid) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       message: "Password does not meet security requirements",
-      errors: passwordValidation.errors 
+      errors: passwordValidation.errors,
     });
   }
 
-  // Check if password is in history
   if (passwordPolicyService.isPasswordInHistory(password, user.passwordHistory)) {
     return res.status(400).json({ message: "Cannot reuse a recent password" });
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
   user.password = hashedPassword;
-  user.resetToken = undefined;
+  user.resetTokenHash = undefined;
   user.resetTokenExpiry = undefined;
-  
-  // Update password history
+  user.sessions = user.sessions.map((session) => ({ ...session, revoked: true }));
+
   user.passwordHistory.push(passwordPolicyService.hashPassword(password));
   if (user.passwordHistory.length > passwordPolicyService.passwordHistoryLimit) {
     user.passwordHistory.shift();
   }
-  
-  // Update password expiration
+
   const passwordExpiresAt = new Date();
   passwordExpiresAt.setDate(passwordExpiresAt.getDate() + passwordPolicyService.passwordExpirationDays);
   user.passwordExpiresAt = passwordExpiresAt;
   user.lastPasswordChange = new Date();
-  
+
   await user.save();
-  
-  // Log activity
+
   await ActivityLogService.logActivity({
     userId: user._id,
     action: "PASSWORD_RESET",
@@ -654,7 +669,7 @@ router.post("/reset-password/:token", async (req, res) => {
     userAgent: req.headers["user-agent"],
     success: true,
   });
-  
+
   res.json({ message: "Password reset successful" });
 });
 

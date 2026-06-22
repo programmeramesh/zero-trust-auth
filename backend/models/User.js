@@ -47,7 +47,7 @@ const userSchema = new mongoose.Schema({
       },
     },
   ],
-  resetToken: String,
+  resetTokenHash: String,
   resetTokenExpiry: Date,
   isActive: {
     type: Boolean,
