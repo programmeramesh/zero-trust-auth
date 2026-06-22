@@ -25,6 +25,8 @@ logs/
 .DS_Store
 Thumbs.db
 
+a.out
+
 # Editor directories and files
 .vscode/
 .idea/

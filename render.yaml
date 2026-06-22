@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: secure-login-backend
+    env: node
+    plan: free
+    branch: main
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && npm start
+    healthCheckPath: /
+
+  - type: static
+    name: secure-login-frontend
+    env: static
+    plan: free
+    branch: main
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist

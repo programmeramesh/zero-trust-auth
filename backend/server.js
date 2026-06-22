@@ -6,6 +6,14 @@ const cors = require("cors");
 const helmet = require("helmet");
 require("dotenv").config();
 
+const requiredEnvVars = ["MONGO_URI", "JWT_SECRET", "FRONTEND_URL"];
+const missingEnvVars = requiredEnvVars.filter((name) => !process.env[name]);
+if (missingEnvVars.length) {
+  console.warn(
+    `Missing required environment variables: ${missingEnvVars.join(", ")}`
+  );
+}
+
 console.log("🚀 Server starting...");
 
 const authRoutes          = require("./routes/auth");
