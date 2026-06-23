@@ -64,8 +64,8 @@ app.use(helmet({
 // CORS configuration - Restrict to specific origins in production
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? process.env.FRONTEND_URL?.split(',') 
-    : ['http://localhost:5173', 'http://localhost:3000'],
+    ? (process.env.FRONTEND_URL?.split(',') || '*')
+    : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:3001'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
