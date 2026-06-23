@@ -11,7 +11,7 @@ const {
   generateTags,
   autoRename,
   checkDuplicate,
-} = require("../utils/ai");
+} = require("../Utils/ai");
 
 // ─────────────────────────────────────────
 // POST /api/files/upload

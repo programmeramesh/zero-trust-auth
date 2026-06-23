@@ -10,7 +10,7 @@ const {
   generateStorageInsights,
   generateSecurityReport,
   generateNotifications,
-} = require("../utils/ai");
+} = require("../Utils/ai");
 
 // GET /api/insights/report
 router.get("/report", authMiddleware, async (req, res) => {
