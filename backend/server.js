@@ -116,10 +116,31 @@ app.use((req, res, next) => {
 // Apply rate limiting
 app.use(generalLimiter);
 
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
-  .catch((err) => console.log("❌ MongoDB Error:", err));
+const mongoUri = process.env.MONGO_URI;
+if (!mongoUri) {
+  console.error('❌ MONGO_URI is not set. Set the MONGO_URI environment variable in your hosting provider.');
+  process.exit(1);
+}
+
+(async () => {
+  try {
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 5000,
+    });
+    console.log("✅ MongoDB Connected");
+  } catch (err) {
+    console.error("❌ MongoDB Connection Error:", err && err.message ? err.message : err);
+    console.error("Possible causes:");
+    console.error(" - Incorrect MONGO_URI (check username, password, host, and SRV format)");
+    console.error(" - Network/firewall or IP access list blocking the deployment (MongoDB Atlas IP Access List)");
+    console.error(" - Atlas cluster paused or unavailable");
+    console.error("Action items:");
+    console.error(" - Verify the MONGO_URI value in your Render environment variables");
+    console.error(" - In MongoDB Atlas, add Render's outbound IPs or 0.0.0.0/0 to the IP Access List for testing");
+    console.error(" - Ensure your cluster is running and accepts connections from your current region");
+    process.exit(1);
+  }
+})();
 
 // Apply stricter rate limiting to auth routes
 app.use("/api/auth/login", authLimiter);
